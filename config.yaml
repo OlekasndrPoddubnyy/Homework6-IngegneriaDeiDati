@@ -1,0 +1,151 @@
+# Configuration for Automobile Data Integration Project
+
+# Data paths
+data:
+  raw_dir: 'data/raw'
+  processed_dir: 'data/processed'
+  ground_truth_dir: 'data/ground_truth'
+  
+  sources:
+    craigslist:
+      path: 'data/raw/craigslist/vehicles.csv'
+      name: 'Craigslist'
+    usedcars:
+      path: 'data/raw/usedcars/used_cars_data.csv'
+      name: 'US Used Cars'
+
+# Schema Mediato
+mediated_schema:
+  attributes:
+    - vin           # Vehicle Identification Number
+    - price         # Prezzo
+    - year          # Anno
+    - manufacturer  # Marca
+    - model         # Modello
+    - condition     # Condizione
+    - cylinders     # Cilindri
+    - fuel          # Tipo di carburante
+    - odometer      # Chilometraggio
+    - transmission  # Trasmissione
+    - drive         # Trazione
+    - size          # Dimensione
+    - type          # Tipo di veicolo
+    - paint_color   # Colore
+    - state         # Stato (US)
+    - description   # Descrizione
+
+# Ground Truth generation
+ground_truth:
+  test_split: 0.2
+  validation_split: 0.1
+  random_seed: 42
+  min_vin_length: 11  # VIN parziali
+  clean_strategy: 'strict'  # 'strict' or 'lenient'
+
+# Blocking Strategies
+blocking:
+  B1:
+    name: 'Standard Blocking'
+    keys:
+      - year
+      - manufacturer
+    description: 'Blocco basato su anno e marca'
+    
+  B2:
+    name: 'Extended Blocking'
+    keys:
+      - year
+      - manufacturer
+      - model_prefix  # primi 3 caratteri del modello
+    description: 'Blocco più restrittivo con prefisso modello'
+
+# Record Linkage (rule-based)
+record_linkage:
+  comparison_fields:
+    year:
+      method: 'exact'
+      weight: 0.15
+    manufacturer:
+      method: 'string'
+      threshold: 0.85
+      weight: 0.20
+    model:
+      method: 'string'
+      threshold: 0.85
+      weight: 0.20
+    price:
+      method: 'numeric'
+      threshold: 0.10  # 10% difference
+      weight: 0.10
+    odometer:
+      method: 'numeric'
+      threshold: 0.15  # 15% difference
+      weight: 0.15
+    fuel:
+      method: 'exact'
+      weight: 0.05
+    transmission:
+      method: 'exact'
+      weight: 0.05
+    type:
+      method: 'string'
+      threshold: 0.80
+      weight: 0.10
+  
+  match_threshold: 0.7
+  possible_match_threshold: 0.5
+
+# Dedupe configuration
+dedupe:
+  training_file: 'models/dedupe/training.json'
+  settings_file: 'models/dedupe/settings'
+  num_cores: 4
+  recall_weight: 2  # Favorire recall vs precision
+
+# Ditto configuration
+ditto:
+  model_name: 'ditto'
+  max_len: 256
+  batch_size: 16
+  epochs: 20
+  learning_rate: 3e-5
+  checkpoint_dir: 'models/ditto'
+  github_repo: 'https://github.com/MarcoNapoleone/FAIR-DA4ER'
+
+# Evaluation metrics
+evaluation:
+  metrics:
+    - precision
+    - recall
+    - f1_score
+    - accuracy
+  timing:
+    - training_time
+    - inference_time
+  
+  pipelines:
+    - name: 'B1-RecordLinkage'
+      blocking: 'B1'
+      method: 'record_linkage'
+    - name: 'B2-RecordLinkage'
+      blocking: 'B2'
+      method: 'record_linkage'
+    - name: 'B1-Dedupe'
+      blocking: 'B1'
+      method: 'dedupe'
+    - name: 'B2-Dedupe'
+      blocking: 'B2'
+      method: 'dedupe'
+    - name: 'B1-Ditto'
+      blocking: 'B1'
+      method: 'ditto'
+    - name: 'B2-Ditto'
+      blocking: 'B2'
+      method: 'ditto'
+
+# Output
+output:
+  results_dir: 'results'
+  figures_dir: 'results/visualizations'
+  metrics_dir: 'results/metrics'
+  report_dir: 'docs'
