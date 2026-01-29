@@ -236,12 +236,26 @@ class GroundTruthGenerator:
         
         # Seconda split: train vs val
         val_size_adjusted = val_size / (1 - test_size)
-        train, val = train_test_split(
-            train_val,
-            test_size=val_size_adjusted,
-            random_state=random_state,
-            stratify=train_val['label']
-        )
+        
+        # Verifica se ci sono abbastanza campioni per stratify
+        min_samples_per_class = train_val['label'].value_counts().min()
+        n_val = int(len(train_val) * val_size_adjusted)
+        
+        if n_val < 2 or min_samples_per_class < 2:
+            # Se validation set troppo piccolo, usa split senza stratify
+            train, val = train_test_split(
+                train_val,
+                test_size=val_size_adjusted,
+                random_state=random_state,
+                shuffle=True
+            )
+        else:
+            train, val = train_test_split(
+                train_val,
+                test_size=val_size_adjusted,
+                random_state=random_state,
+                stratify=train_val['label']
+            )
         
         print(f"Split completato:")
         print(f"  - Training: {len(train)} ({len(train)/len(ground_truth)*100:.1f}%)")

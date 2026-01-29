@@ -145,7 +145,7 @@ class DataAnalyzer:
         null_stats = self.analysis_results['null_values'].head(top_n)
         
         plt.figure(figsize=(12, 8))
-        sns.barplot(data=null_stats, y='attribute', x='null_percentage', palette='RdYlGn_r')
+        sns.barplot(data=null_stats, y='attribute', x='null_percentage', hue='attribute', palette='RdYlGn_r', legend=False)
         plt.xlabel('Percentuale Valori Nulli (%)', fontsize=12)
         plt.ylabel('Attributo', fontsize=12)
         plt.title(f'{self.source_name}: Percentuale Valori Nulli per Attributo (Top {top_n})', 
@@ -171,7 +171,7 @@ class DataAnalyzer:
         unique_stats = self.analysis_results['unique_values'].head(top_n)
         
         plt.figure(figsize=(12, 8))
-        sns.barplot(data=unique_stats, y='attribute', x='unique_percentage', palette='viridis')
+        sns.barplot(data=unique_stats, y='attribute', x='unique_percentage', hue='attribute', palette='viridis', legend=False)
         plt.xlabel('Percentuale Valori Unici (%)', fontsize=12)
         plt.ylabel('Attributo', fontsize=12)
         plt.title(f'{self.source_name}: Percentuale Valori Unici per Attributo (Top {top_n})', 

@@ -149,7 +149,23 @@ class RecordLinkageClassifier:
         for field, params in comparison_fields.items():
             if field in features.columns:
                 weight = params['weight']
-                scores += features[field].fillna(0) * weight
+                # Get the field as a Series and ensure it's numeric
+                field_data = features[field]
+                
+                # If field_data is a DataFrame (duplicate columns), take the first column
+                if isinstance(field_data, pd.DataFrame):
+                    field_data = field_data.iloc[:, 0]
+                
+                # Convert to Series if needed and make numeric
+                if not isinstance(field_data, pd.Series):
+                    field_data = pd.Series(field_data, index=features.index)
+                
+                # Convert to numeric, coercing errors to NaN, then fill NaN with 0
+                field_data = pd.to_numeric(field_data, errors='coerce').fillna(0)
+                
+                # Multiply by weight and add to scores
+                field_scores = field_data * weight
+                scores = scores.add(field_scores, fill_value=0)
         
         return scores
     
