@@ -107,7 +107,7 @@ class RecordLinkageClassifier:
                                     offset=threshold, label=field)
     
     def compute_features(self, df1: pd.DataFrame, df2: pd.DataFrame, 
-                        candidate_pairs: pd.MultiIndex) -> pd.DataFrame:
+                        candidate_pairs: pd.MultiIndex, verbose: bool = True) -> pd.DataFrame:
         """
         Calcola feature di similarità per le coppie candidate
         
@@ -115,6 +115,7 @@ class RecordLinkageClassifier:
             df1: Primo DataFrame
             df2: Secondo DataFrame
             candidate_pairs: Coppie candidate dal blocking
+            verbose: Se True, stampa informazioni
             
         Returns:
             DataFrame con feature di similarità
@@ -122,7 +123,8 @@ class RecordLinkageClassifier:
         self.setup_comparisons(df1, df2)
         self.features = self.compare.compute(candidate_pairs, df1, df2)
         
-        print(f"Feature calcolate per {len(self.features)} coppie")
+        if verbose:
+            print(f"Feature calcolate per {len(self.features)} coppie")
         
         return self.features
     
@@ -170,7 +172,7 @@ class RecordLinkageClassifier:
         return scores
     
     def classify(self, df1: pd.DataFrame, df2: pd.DataFrame,
-                candidate_pairs: pd.MultiIndex) -> pd.DataFrame:
+                candidate_pairs: pd.MultiIndex, batch_size: int = None) -> pd.DataFrame:
         """
         Classifica le coppie come match/non-match
         
@@ -178,12 +180,65 @@ class RecordLinkageClassifier:
             df1: Primo DataFrame
             df2: Secondo DataFrame
             candidate_pairs: Coppie candidate dal blocking
+            batch_size: Dimensione del batch per processamento (None = no batching)
+            
+        Returns:
+            DataFrame con classificazione
+        """
+        # Se batch_size non è specificato o le coppie sono poche, processa tutto insieme
+        if batch_size is None or len(candidate_pairs) <= batch_size:
+            return self._classify_single(df1, df2, candidate_pairs)
+        
+        # Altrimenti, processa in batch
+        print(f"Processamento in batch (dimensione batch: {batch_size:,})")
+        
+        all_results = []
+        n_pairs = len(candidate_pairs)
+        n_batches = (n_pairs + batch_size - 1) // batch_size
+        
+        for i in range(0, n_pairs, batch_size):
+            batch_num = i // batch_size + 1
+            end_idx = min(i + batch_size, n_pairs)
+            
+            print(f"  Batch {batch_num}/{n_batches}: processing pairs {i:,} to {end_idx:,}...", end='')
+            
+            # Ottieni il batch di coppie
+            batch_pairs = candidate_pairs[i:end_idx]
+            
+            # Classifica il batch
+            batch_results = self._classify_single(df1, df2, batch_pairs, verbose=False)
+            all_results.append(batch_results)
+            
+            print(" ✓")
+        
+        # Combina tutti i risultati
+        results = pd.concat(all_results)
+        
+        # Aggiorna matches
+        self.matches = results[results['prediction'] == 1]
+        
+        print(f"\n✓ Classificazione completata")
+        print(f"Match trovati: {len(self.matches):,}")
+        print(f"Score medio match: {self.matches['score'].mean():.3f}")
+        
+        return results
+    
+    def _classify_single(self, df1: pd.DataFrame, df2: pd.DataFrame,
+                        candidate_pairs: pd.MultiIndex, verbose: bool = True) -> pd.DataFrame:
+        """
+        Classifica un singolo batch di coppie
+        
+        Args:
+            df1: Primo DataFrame
+            df2: Secondo DataFrame
+            candidate_pairs: Coppie candidate dal blocking
+            verbose: Se True, stampa informazioni
             
         Returns:
             DataFrame con classificazione
         """
         # Calcola feature
-        features = self.compute_features(df1, df2, candidate_pairs)
+        features = self.compute_features(df1, df2, candidate_pairs, verbose=verbose)
         
         # Calcola score
         scores = self.compute_weighted_score(features)
@@ -196,10 +251,10 @@ class RecordLinkageClassifier:
             'prediction': (scores >= match_threshold).astype(int)
         })
         
-        self.matches = results[results['prediction'] == 1]
-        
-        print(f"Match trovati: {len(self.matches)}")
-        print(f"Score medio match: {self.matches['score'].mean():.3f}")
+        if verbose:
+            matches = results[results['prediction'] == 1]
+            print(f"Match trovati: {len(matches)}")
+            print(f"Score medio match: {matches['score'].mean():.3f}")
         
         return results
     
